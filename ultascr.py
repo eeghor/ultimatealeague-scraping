@@ -2,13 +2,48 @@ import selenium
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
-from bs4 import BeautifulSoup
-from selenium.webdriver.common.action_chains import ActionChains
 import time
 import re
+import pandas as pd
 
+# choose the range of years you are interested in; the earliest available year is 1897
+y_from = 2006
+y_to = 2007
+
+"""
+choose what format to save data in:
+	0 : don't save at all, just show first 10 rdata ows on screen
+	1 : save as a table in .CSV 
+	2 : save as a JSON file
+"""
+save_flag = 1
+
+# want to see yearly counts for the retrieved records? 1 for yes
+
+show_yrecs = 1
+
+# sanity check
+
+assert y_from > 2005, ("sorry, there\'s no data for earliest year {} that you\'ve picked." 
+						"you may want to choose another year from 2006 and on..".format(y_from))
+assert y_to < 2017, ("sorry, there\'s no data for last year {} that you\'ve picked." 
+						"you may want to choose another year before 2017..".format(y_to))
+assert y_from <= y_to, ("no, this won\'t work. make sure that the earliest year you pick is before or equal to the last year...")
+
+# show this 
+print("""-------> scraping ultimatealeague.com""")
+
+list_rounds = []
+list_team_1 = []
+list_team_2 = []
+list_score_1 = []
+list_pen1 = []
+list_score_2 = []
+list_pen2 = []
+list_dates = []
+list_att = []
+list_venues = []
 
 LONGEST_WAIT_SEC = 20
 
@@ -20,8 +55,9 @@ driver.get(start_page_url)
 #driver.implicitly_wait(20)
 # wait up to 10 seconds before throwing a TimeoutException (if there's still no "Previous" link)
 
+right_tab = str(y_from) + "-" + str(y_to)[-2:]
 
-WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, "2005-06"))).click()
+WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, right_tab))).click()
 
 # get the table headers that are in <tr> that belongs to the class "datatrheader"
 hdrs = driver.find_element_by_class_name("datatrheader").text.split()
@@ -33,9 +69,48 @@ tbl = driver.find_element_by_id("tablesort")
 rows = tbl.find_elements_by_xpath('//tbody/tr[@class]')
 
 for r in rows:
-	print(r.text)
-# collect all rows
-#rows = driver.find_elemelts_by_xpath()
+	# go by celld, i.e. <td>s
+	cs = r.find_elements_by_xpath('td[@class]')
 
-# for tr in driver.find_elements_by_class_name("even"):
-# 	print(tr.text)
+	for i, c in enumerate(cs):
+		if i == 1:
+			list_rounds.append(c.text.strip())
+		elif i ==2:
+			list_dates.append(c.text.strip())
+		elif i ==3:
+			list_venues.append(c.text.strip())
+		elif i == 4:
+			list_att.append(c.text.strip())
+		elif i == 5:
+			team1, team2 = c.find_elements_by_xpath('a[@href]')
+			list_team_1.append(team1.text.strip())
+			list_team_2.append(team1.text.strip())
+		elif i == 6:
+
+			score_txt = c.text.split()
+			print("score:",score_txt)
+			if len(score_txt) == 2:  # no penalties, just full time score
+				score_1, score_2 = score_txt
+				pen1 = pen2 = None
+				list_pen1.append(pen1)
+				list_pen2.append(pen2)
+			elif len(score_txt) == 4:  # penalties, i.e. 1 (4) 1 (5)
+				score_1, score_2 = score_txt[::2]
+				pen1, pen2 = score_txt[1::2]
+				list_pen1.append(pen1[1:-1])
+				list_pen2.append(pen2[1:-1])
+
+			list_score_1.append(score_1.strip())
+			list_score_2.append(score_2.strip())
+			
+
+
+data = zip(list_rounds, list_dates, list_team_1, list_score_1, list_pen1, 
+				 list_team_2, list_score_2, list_pen2, list_venues, list_att)
+df = pd.DataFrame(columns="round date team1 t1score t1pen team2 t2score t2pen venue attendance".split())
+
+for i, row in enumerate(data):
+	df.loc[i] = row
+
+print("successfully retrieved {} results..".format(len(df.index)))
+print(df.head(10))
