@@ -9,7 +9,7 @@ import pandas as pd
 
 # choose the range of years you are interested in; the earliest available year is 1897
 y_from = 2005
-y_to = 2008
+y_to = 2016
 
 """
 choose what format to save data in:
@@ -142,7 +142,7 @@ if y_from != y_to:
 else:
 	csv_fl = "scraped_data_from_ultimatealeague_" + str(y_from) + ".csv"
 
-df.to_csv(csv_fl, index=False)
+df.to_csv(csv_fl, index=False, sep="&")
 
 print("successfully retrieved {} results..".format(len(df.index)))
 print(df.head(10))
